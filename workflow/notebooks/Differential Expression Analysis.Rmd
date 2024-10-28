@@ -1,0 +1,141 @@
+---
+title: "Differential Expression Analysis"
+output: html_notebook
+---
+
+# Notebook for differential expression analysis of pig data
+
+```{r loading-libraries}
+suppressMessages(library(DESeq2))
+suppressMessages(library(plotly))
+suppressMessages(require(tidyverse))
+suppressMessages(library(pheatmap))
+library(ensembldb)
+library("pheatmap")
+library(umap)
+library(plotly)
+library(tximport)
+suppressMessages(library("IHW"))
+suppressMessages(library(edgeR))
+suppressPackageStartupMessages(library("tximeta"))
+library("DEGreport")
+library("gplots")
+```
+
+```{r}
+library("TxDb.Hsapiens.UCSC.hg38.knownGene")
+```
+
+
+
+# Utilizing tximport pipeline
+
+Following the vignette https://bioconductor.org/packages/devel/bioc/vignettes/tximport/inst/doc/tximport.html
+```{r creating-tx2gene-object}
+library(ensembldb)
+library(EnsDb.Hsapiens.v86)
+tx <- transcripts(EnsDb.Hsapiens.v86, return.type="DataFrame")
+
+tx2gene <- tx[c("tx_id", "gene_id")]
+colnames(tx2gene) <- c("TXNAME","GENEID")
+head(tx2gene)
+```
+
+
+## Batch1 analysis
+### map-ont mapping preset
+
+```{r preparing-annotations-for-batch1}
+annotation <- data.frame(sample_name=c("30", "32","36", "39","50","1","2","29","35", "37"), group=c("G1","G1","G1","G1","G1","G2","G2","G2","G2","G2"))
+annotation
+```
+
+
+```{r importing-batch1-data}
+files <- file.path("output-unstranded/salmon/", annotation$sample_name, "quant.sf")
+names(files) <- annotation$sample_name
+
+
+
+txi <- tximport(files, type = "salmon", tx2gene = tx2gene,ignoreTxVersion = T)
+
+
+
+```
+#### DESeq2 analysis
+
+```{r batch1-deseq2-analysis}
+coldata <- data.frame(condition=as.factor(annotation$group))
+
+
+rownames(coldata) <- annotation$sample_name
+
+dds<- DESeqDataSetFromTximport(txi,
+                                       colData=coldata,
+                                        design = ~ condition)
+
+
+cds<- DESeq(dds);
+```
+
+
+```{r extracting-deseq2-results}
+de<- results(cds, filterFun=ihw, alpha = 0.05);
+
+```
+
+
+
+```{r}
+de
+```
+
+
+```{r blood1-deseq2-summary}
+summary(de)
+```
+
+
+```{r exporting-results-for-quick-DAVID-analysis}
+de.df <- as.data.frame(de)
+
+de.df <- de.df  %>% dplyr::filter(!is.na(padj) )%>% dplyr::filter(padj < 0.05) %>% dplyr::arrange(log2FoldChange)
+
+```
+
+```{r}
+head(de.df)
+```
+
+
+```{r}
+select <- rownames(de.df)
+df <- as.data.frame(colData(cds)[,"condition"])
+names(df) <- "condition"
+rownames(df) <- colnames(cds)
+df["sums"] <- colSums(counts(cds,normalized=TRUE)[select,])
+df <- df %>% dplyr::arrange(condition, desc(sums)) %>% dplyr::select(condition)
+#df <- df %>% dplyr::mutate(condition=ifelse(condition == "G1", "Group1", "Group2"))
+condition_colour <- list(condition=c(G1="grey", G2="black"))
+pheatmap(t(scale(t(counts(cds,normalized=T))))[select,rownames(df)], cluster_rows=F, show_rownames=FALSE,
+       cluster_cols=F, annotation_col=df, scale="row", annotation_colors = condition_colour, color=bluered(11), annotation_names_col=F,
+      fontsize=10,
+       fontsize_col=8,
+       width=10,
+      cex=1.0,
+      #filename="output-unstranded.png"
+       )
+
+```
+
+
+
+```{r}
+#cat(rownames(de.df %>% dplyr::filter(log2FoldChange < 0)),sep="\n")
+```
+
+
+```{r}
+write.csv(de.df, file="output-unstranded.csv")
+```
+

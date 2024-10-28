@@ -1,0 +1,50 @@
+import pandas as pd
+import pathlib
+from snakemake.utils import min_version
+
+min_version("8.24.1")
+
+samples = pd.read_csv(config["sample_config"])
+
+OUTPUT_BASE = config["output_base"]
+
+sample_name_to_samples_mapping = dict()
+for _, row in samples.iterrows(): # constructing a mapping between sample names and all sample locations
+	sname = str(row["Name"])
+	left = row["LocationLeft"]
+	right = row["LocationRight"]
+	sample_name_to_samples_mapping[sname] = {"left": left, "right": right}
+    
+sample_names = list(map(str, sample_name_to_samples_mapping.keys()))
+
+
+def get_paths_from_wildcards_with_sample_name(wildcards):
+	return sample_name_to_samples_mapping[wildcards.sample_name]
+
+
+
+rule salmon:
+	input:
+		unpack(get_paths_from_wildcards_with_sample_name)	
+
+	output:
+		f"{OUTPUT_BASE}/salmon/{{sample_name}}/quant.sf"
+
+	params:
+		transcriptome_index=config["index"]
+
+	conda:
+		"envs/salmon.yaml"
+	threads: 8
+
+	shell:
+		f"""
+		salmon quant -i {{params.transcriptome_index}} -l IU -1 {{input.left}} -2 {{input.right}} --validateMappings -o {OUTPUT_BASE}/salmon/{{wildcards.sample_name}}
+		"""
+        
+rule all:
+	localrule: True
+	default_target: True
+	input:
+		expand(f"{OUTPUT_BASE}/salmon/{{sample_name}}/quant.sf", sample_name=sample_names)
+        

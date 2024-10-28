@@ -1,0 +1,2 @@
+def my_super_tokenizer(s:str):                                                                                                                                                                               
+    return s.split("\t")[:2] 
