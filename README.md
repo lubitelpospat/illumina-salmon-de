@@ -4,8 +4,6 @@ Actual DE analysis is in Rmd file in workflow/notebooks/
 
 
 
-# prepDE
-The prepDE script that comes with stringtie is broken. use the prepDE.fixed.py3 in workflow/scripts/
 
 
 # Building salmon index
