@@ -11,8 +11,8 @@ OUTPUT_BASE = config["output_base"]
 sample_name_to_samples_mapping = dict()
 for _, row in samples.iterrows(): # constructing a mapping between sample names and all sample locations
 	sname = str(row["Name"])
-	left = row["LocationLeft"]
-	right = row["LocationRight"]
+	left = row["Left"]
+	right = row["Right"]
 	sample_name_to_samples_mapping[sname] = {"left": left, "right": right}
     
 sample_names = list(map(str, sample_name_to_samples_mapping.keys()))
@@ -31,7 +31,8 @@ rule salmon:
 		f"{OUTPUT_BASE}/salmon/{{sample_name}}/quant.sf"
 
 	params:
-		transcriptome_index=config["index"]
+		transcriptome_index=config["index"],
+		libtype=config["libtype"] if "libtype" in config.keys() else "IU"
 
 	conda:
 		"envs/salmon.yaml"
@@ -39,7 +40,7 @@ rule salmon:
 
 	shell:
 		f"""
-		salmon quant -i {{params.transcriptome_index}} -l IU -1 {{input.left}} -2 {{input.right}} --validateMappings -o {OUTPUT_BASE}/salmon/{{wildcards.sample_name}}
+		salmon quant -i {{params.transcriptome_index}} -l {{params.libtype}} -1 {{input.left}} -2 {{input.right}} --validateMappings -o {OUTPUT_BASE}/salmon/{{wildcards.sample_name}}
 		"""
         
 rule all:

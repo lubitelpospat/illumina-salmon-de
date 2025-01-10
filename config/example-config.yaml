@@ -1,3 +1,4 @@
 output_base: "output"
 sample_config: "config/example-samples.csv"
 index: "/path/to/salmon_index"
+libtype: "ISF"
